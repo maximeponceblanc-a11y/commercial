@@ -523,7 +523,7 @@ elif not vue_annuelle and len(annees_selectionnees) > 0:
                 col_gauche, col_droite = st.columns([6.5, 3.5])
                 
                 with col_gauche:
-                    st.markdown(f"**Performance Mensuelle Financement ({annee_selectionnee})**")
+                    st.markdown(f"**Performance Mensuelle CA ({annee_selectionnee})**")
                     
                     base_ca = df_annee.groupby('Mois_Nom')['Prix total'].sum().reindex(mois_selectionnes_bornes, fill_value=0).reset_index(name='Chiffre d\'affaire')
                     df_annee_signe = df_annee[df_annee["Signé?"].astype(str).str.upper().str.strip() == "O"]
