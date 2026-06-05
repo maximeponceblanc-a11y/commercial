@@ -44,32 +44,65 @@ def load_ponceblanc_data():
         st.error(f"Erreur lors de la récupération du fichier PONCEBLANC sur GitHub : {e}")
         st.stop()
 
+    # Nettoyage initial des espaces dans les noms de colonnes
     df.columns = df.columns.str.strip()
 
-    if 'Dates' in df.columns:
-        s_numeric = pd.to_numeric(df['Dates'], errors='coerce')
+    # --- RECHERCHE FLEXIBLE ET SÉCURISÉE DES COLONNES ---
+    def get_flexible_col(target):
+        for col in df.columns:
+            if target.lower() in col.lower():
+                return col
+        return None
+
+    col_dates = get_flexible_col('Dates')
+    col_mois = get_flexible_col('Mois devis')
+    col_annee = get_flexible_col('Année Devis')
+    col_prix = get_flexible_col('Prix total')
+    col_signe = get_flexible_col('Signé?') or get_flexible_col('Signé ?') or get_flexible_col('Signé')
+
+    # --- TRAITEMENT DES DATES ---
+    if col_dates:
+        s_numeric = pd.to_numeric(df[col_dates], errors='coerce')
         df['Dates_Propres'] = pd.to_datetime(s_numeric, unit='D', origin='1899-12-30', errors='coerce')
-        df['Dates_Propres'] = df['Dates_Propres'].fillna(pd.to_datetime(df['Dates'], errors='coerce'))
+        df['Dates_Propres'] = df['Dates_Propres'].fillna(pd.to_datetime(df[col_dates], errors='coerce'))
         df = df.dropna(subset=['Dates_Propres'])
 
-    if 'Mois devis' in df.columns:
-        df['Mois_Num'] = pd.to_numeric(df['Mois devis'], errors='coerce').fillna(1).astype(int)
+    # --- TRAITEMENT DES MOIS ---
+    if col_mois:
+        df['Mois_Num'] = pd.to_numeric(df[col_mois], errors='coerce').fillna(1).astype(int)
     elif 'Dates_Propres' in df.columns:
         df['Mois_Num'] = df['Dates_Propres'].dt.month.fillna(1).astype(int)
     else:
         df['Mois_Num'] = 1
 
-    if 'Année Devis' in df.columns:
-        df['Année Devis'] = pd.to_numeric(df['Année Devis'], errors='coerce').fillna(2026).astype(int)
+    # --- TRAITEMENT DES ANNÉES ---
+    if col_annee:
+        df['Année Devis'] = pd.to_numeric(df[col_annee], errors='coerce').fillna(2026).astype(int)
     elif 'Dates_Propres' in df.columns:
         df['Année Devis'] = df['Dates_Propres'].dt.year.fillna(2026).astype(int)
     else:
         df['Année Devis'] = 2026
 
-    mois_fr = {1:"Janvier",2:"Février",3:"Mars",4:"Avril",5:"Mai",6:"Juin",
-               7:"Juillet",8:"Août",9:"Septembre",10:"Octobre",11:"Novembre",12:"Décembre"}
+    # --- CARTOGRAPHIE DES MOIS EN FRANÇAIS ---
+    mois_fr = {1:"Janvier", 2:"Février", 3:"Mars", 4:"Avril", 5:"Mai", 6:"Juin",
+               7:"Juillet", 8:"Août", 9:"Septembre", 10:"Octobre", 11:"Novembre", 12:"Décembre"}
     df['Mois_Nom'] = df['Mois_Num'].map(mois_fr).fillna("Janvier")
-    df['Prix total'] = pd.to_numeric(df['Prix total'], errors='coerce').fillna(0)
+
+    # --- TRAITEMENT DU PRIX TOTAL ---
+    if col_prix:
+        df['Prix total'] = pd.to_numeric(df[col_prix], errors='coerce').fillna(0)
+    else:
+        df['Prix total'] = 0.0
+
+    # --- NORMALISATION DE LA COLONNE SIGNÉ ---
+    if col_signe and col_signe != 'Signé?':
+        df = df.rename(columns={col_signe: 'Signé?'})
+    
+    if 'Signé?' in df.columns:
+        df['Signé?'] = df['Signé?'].astype(str).str.strip().str.upper()
+        df['Signé?'] = df['Signé?'].map({'VRAI':'O','TRUE':'O','O':'O','FAUX':'N','FALSE':'N','N':'N'}).fillna('N')
+    else:
+        df['Signé?'] = 'N'
 
     return df
 
@@ -84,12 +117,27 @@ def load_lbfi_data():
         st.error(f"Erreur lors de la récupération du fichier LBFI sur GitHub : {e}")
         st.stop()
 
+    # Nettoyage des noms de colonnes
     df.columns = [str(c).strip() for c in df.columns]
 
-    if 'Date devis' in df.columns:
-        s_numeric = pd.to_numeric(df['Date devis'], errors='coerce')
+    # --- RECHERCHE FLEXIBLE ET SÉCURISÉE DES COLONNES ---
+    def get_flexible_col(target):
+        for col in df.columns:
+            if target.lower() in col.lower():
+                return col
+        return None
+
+    col_date_devis = get_flexible_col('Date devis')
+    col_prix = get_flexible_col('Prix total')
+    col_signe = get_flexible_col('Signé?') or get_flexible_col('Signé ?') or get_flexible_col('Signé')
+    col_ouverture = get_flexible_col('Date ouverture dossier fab')
+    col_num_devis = get_flexible_col('Numéro de devis') or get_flexible_col('DEVIS N°')
+
+    # --- TRAITEMENT DES DATES ---
+    if col_date_devis:
+        s_numeric = pd.to_numeric(df[col_date_devis], errors='coerce')
         df['Dates_Propres'] = pd.to_datetime(s_numeric, unit='D', origin='1899-12-30', errors='coerce')
-        df['Dates_Propres'] = df['Dates_Propres'].fillna(pd.to_datetime(df['Date devis'], errors='coerce'))
+        df['Dates_Propres'] = df['Dates_Propres'].fillna(pd.to_datetime(df[col_date_devis], errors='coerce'))
         df = df.dropna(subset=['Dates_Propres'])
 
     if 'Dates_Propres' in df.columns:
@@ -99,29 +147,41 @@ def load_lbfi_data():
         df['Mois_Num'] = 1
         df['Année Devis'] = 2026
 
-    mois_fr = {1:"Janvier",2:"Février",3:"Mars",4:"Avril",5:"Mai",6:"Juin",
-               7:"Juillet",8:"Août",9:"Septembre",10:"Octobre",11:"Novembre",12:"Décembre"}
+    # --- CARTOGRAPHIE DES MOIS EN FRANÇAIS ---
+    mois_fr = {1:"Janvier", 2:"Février", 3:"Mars", 4:"Avril", 5:"Mai", 6:"Juin",
+               7:"Juillet", 8:"Août", 9:"Septembre", 10:"Octobre", 11:"Novembre", 12:"Décembre"}
     df['Mois_Nom'] = df['Mois_Num'].map(mois_fr).fillna("Janvier")
-    df['Prix total'] = pd.to_numeric(df['Prix total'], errors='coerce').fillna(0)
 
-    # Normalisation Signé : VRAI/FAUX → O/N
-    if 'Signé ?' in df.columns:
-        df = df.rename(columns={'Signé ?': 'Signé?'})
+    # --- TRAITEMENT DU PRIX TOTAL (Résout l'erreur KeyError) ---
+    if col_prix:
+        df['Prix total'] = pd.to_numeric(df[col_prix], errors='coerce').fillna(0)
+    else:
+        # Si la colonne manque ou si l'onglet LBFI est actuellement vide dans Excel
+        df['Prix total'] = 0.0
+
+    # --- NORMALISATION DE LA COLONNE SIGNÉ ---
+    if col_signe and col_signe != 'Signé?':
+        df = df.rename(columns={col_signe: 'Signé?'})
+    
     if 'Signé?' in df.columns:
         df['Signé?'] = df['Signé?'].astype(str).str.strip().str.upper()
-        df['Signé?'] = df['Signé?'].map({'VRAI':'O','TRUE':'O','FAUX':'N','FALSE':'N'}).fillna('N')
+        df['Signé?'] = df['Signé?'].map({'VRAI':'O','TRUE':'O','O':'O','FAUX':'N','FALSE':'N','N':'N'}).fillna('N')
+    else:
+        df['Signé?'] = 'N'
 
-    # Calcul du délai devis → ouverture dossier fab
-    if 'Date ouverture dossier fab' in df.columns and 'Dates_Propres' in df.columns:
-        date_ouv_num = pd.to_numeric(df['Date ouverture dossier fab'], errors='coerce')
+    # --- CALCUL DU DÉLAI D'OUVERTURE DOSSIER ---
+    if col_ouverture and 'Dates_Propres' in df.columns:
+        date_ouv_num = pd.to_numeric(df[col_ouverture], errors='coerce')
         date_ouv = pd.to_datetime(date_ouv_num, unit='D', origin='1899-12-30', errors='coerce')
-        date_ouv = date_ouv.fillna(pd.to_datetime(df['Date ouverture dossier fab'], errors='coerce'))
+        date_ouv = date_ouv.fillna(pd.to_datetime(df[col_ouverture], errors='coerce'))
         df['Délai devis ouverture'] = (date_ouv - df['Dates_Propres']).dt.days
         df['Délai devis ouverture'] = df['Délai devis ouverture'].where(df['Délai devis ouverture'] >= 0)
 
-    # Renommage pour uniformiser avec PONCEBLANC
-    if 'Numéro de devis' in df.columns:
-        df = df.rename(columns={'Numéro de devis': 'DEVIS N°'})
+    # --- UNIFORMISATION DU NUMÉRO DE DEVIS ---
+    if col_num_devis and col_num_devis != 'DEVIS N°':
+        df = df.rename(columns={col_num_devis: 'DEVIS N°'})
+    elif 'DEVIS N°' not in df.columns:
+        df['DEVIS N°'] = "N/A"
 
     return df
 
