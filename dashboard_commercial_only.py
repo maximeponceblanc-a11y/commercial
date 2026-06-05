@@ -84,7 +84,7 @@ def load_lbfi_data():
         st.error(f"Erreur lors de la récupération du fichier LBFI sur GitHub : {e}")
         st.stop()
 
-    df.columns = df.columns.str.strip()
+    df.columns = [str(c).strip() for c in df.columns]
 
     if 'Date devis' in df.columns:
         s_numeric = pd.to_numeric(df['Date devis'], errors='coerce')
