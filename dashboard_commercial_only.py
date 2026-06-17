@@ -142,7 +142,6 @@ def load_data(bu_name):
         df = df.rename(columns={'Signé ?': 'Signé?'})
     if 'Signé?' in df.columns:
         df['Signé?'] = df['Signé?'].astype(str).str.strip().str.upper()
-        # Ajout de 'O' et 'N' dans le dictionnaire pour éviter de les écraser par un NaN
         df['Signé?'] = df['Signé?'].map({'VRAI': 'O', 'TRUE': 'O', 'O': 'O', 'FAUX': 'N', 'FALSE': 'N', 'N': 'N'}).fillna('N')
 
     if 'Date ouverture dossier fab' in df.columns and 'Dates_Propres' in df.columns:
@@ -232,9 +231,9 @@ def calculer_classification_abc_par_annee(dataframe):
 # ========================================================
 st.sidebar.header("🎛️ Filtres & Paramètres")
 
-# Bouton à bascule pour changer de Business Unit
-bu_toggle = st.sidebar.toggle("📈 Basculer vers PONCEBLANC (Par défaut : LBFI)", value=False)
-bu_name = "PONCEBLANC" if bu_toggle else "LBFI"
+# Bouton à bascule pour changer de Business Unit (PONCEBLANC par défaut)
+bu_toggle = st.sidebar.toggle("📈 Basculer vers LBFI (Par défaut : PONCEBLANC)", value=False)
+bu_name = "LBFI" if bu_toggle else "PONCEBLANC"
 
 # Chargement dynamique des données de la BU sélectionnée
 try:
@@ -290,6 +289,25 @@ mois_selectionnes_bornes = liste_mois_noms[mois_debut_num - 1:mois_fin_num]
 mask_temporel = (df['Année Devis'].isin(annees_selectionnees)) & (df['Mois_Num'] >= mois_debut_num) & (df['Mois_Num'] <= mois_fin_num)
 
 st.sidebar.markdown("### 📁 Dossier")
+
+# --- NOUVEAU FILTRE : INTERVALLE DE MONTANT ---
+if 'Prix total' in df.columns and not df.empty:
+    min_val_df = float(df['Prix total'].min())
+    max_val_df = float(df['Prix total'].max())
+    
+    if pd.isna(min_val_df): min_val_df = 0.0
+    if pd.isna(max_val_df): max_val_df = 10000.0
+    if min_val_df == max_val_df: max_val_df = min_val_df + 1.0
+
+    montant_min, montant_max = st.sidebar.slider(
+        "Intervalle de montant (€) :",
+        min_value=min_val_df,
+        max_value=max_val_df,
+        value=(min_val_df, max_val_df)
+    )
+    mask_metier &= df["Prix total"].between(montant_min, montant_max)
+else:
+    montant_min, montant_max = 0.0, 0.0
 
 selected_abc = st.sidebar.multiselect(
     "Catégorie Client (ABC)",
@@ -419,18 +437,6 @@ def fmt_val(v, unite="€", is_pct=False, decimals=0):
 
 def render_kpi_section(kpis_current, kpis_prev, kpis_next,
                        annee_selectionnee, annee_prev, annee_next):
-    """
-    Renders the 8 KPI cards arranged in the « Formule Magique » layout:
-
-    Row 1 — Volume formula:
-      [Nb devis]  ×  [% Succès vol]  =  [Nb commandes]
-
-    Row 2 — Arrows & Average order (2D Multipliers):
-                     [Devis moyen]           ⬇(thick) ×  [Cmd moy. signés]
-
-    Row 3 — CA formula:
-      [CA Devisé] ×  [% Succès €]    =  [CA Commandes]
-    """
     if not kpis_current:
         st.info("Aucun indicateur disponible pour cette période.")
         return
@@ -486,7 +492,6 @@ def render_kpi_section(kpis_current, kpis_prev, kpis_next,
     # ── ROW 2 : FLÈCHES 2D ET MULTIPLICATEURS VERTICAUX ──
     cols2 = st.columns([4, 0.5, 4, 0.5, 4, 0.5, 4])
     
-    # Partie gauche : Flèche et "x" retirés comme demandé
     with cols2[0]:
         st.write("")
     with cols2[1]:
@@ -500,7 +505,6 @@ def render_kpi_section(kpis_current, kpis_prev, kpis_next,
             force_color="accent",
         )
 
-    # Partie droite : Nb commandes -> CA Commandes (avec Flèche SVG sur mesure)
     with cols2[4]:
         arrow_svg = """
         <div style='display:flex; justify-content:center; align-items:center; padding-top: 15px; padding-bottom: 5px;'>
@@ -575,14 +579,6 @@ if vue_annuelle and len(annees_selectionnees) > 0:
 
     kpis_courant = extraire_kpis_annee(df_filtered_base, annee_courante)
     kpis_precedent = extraire_kpis_annee(df[mask_metier], annee_precedente)
-
-    def delta_str(val, ref, unite="€", is_pct=False):
-        if ref is None:
-            return None
-        d = val - ref
-        if is_pct:
-            return f"{'+' if d >= 0 else ''}{d:.2f} pts".replace('.', ',')
-        return f"{'+' if d >= 0 else ''}{d:,.0f} {unite}".replace(',', ' ')
 
     ref = kpis_precedent
 
@@ -666,7 +662,6 @@ if vue_annuelle and len(annees_selectionnees) > 0:
             df_recap['Commandes'] = df_recap['vol_signe'].astype(int)
             df_recap['Devis émis'] = df_recap['vol_devis'].astype(int)
             df_recap['Tx Succès (vol)'] = df_recap['tx_vol'].map(lambda x: f"{x:.2f} %".replace('.', ','))
-            # Remplacement du libellé "Cmd moy. (tous)" par "Devis moyen" dans le récap
             df_recap['Devis moyen'] = df_recap['cmd_moy_tous'].map(lambda x: f"{x:,.0f} €".replace(',', ' '))
             df_recap['Cmd moy. (signés)'] = df_recap['cmd_moy_signe'].map(lambda x: f"{x:,.0f} €".replace(',', ' '))
             st.dataframe(df_recap[['Année', 'CA Commandes', 'CA Devisé', 'Tx Succès (€)', 'Commandes', 'Devis émis', 'Tx Succès (vol)', 'Devis moyen', 'Cmd moy. (signés)']], use_container_width=True, hide_index=True)
@@ -1317,6 +1312,10 @@ def construire_resume_filtres():
             parties.append(f"Mois : {start_month}")
         else:
             parties.append(f"Mois : {start_month} → {end_month}")
+            
+    # Ajout du filtre de montant dans le récapitulatif
+    parties.append(f"Montant : {montant_min:,.0f}€ à {montant_max:,.0f}€".replace(',', ' '))
+    
     if selected_abc and len(selected_abc) < 4:
         parties.append(f"Catégorie ABC : {', '.join(selected_abc)}")
     else:
