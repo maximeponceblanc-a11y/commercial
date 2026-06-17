@@ -290,21 +290,34 @@ mask_temporel = (df['Année Devis'].isin(annees_selectionnees)) & (df['Mois_Num'
 
 st.sidebar.markdown("### 📁 Dossier")
 
-# --- NOUVEAU FILTRE : INTERVALLE DE MONTANT ---
-if 'Prix total' in df.columns and not df.empty:
-    min_val_df = float(df['Prix total'].min())
-    max_val_df = float(df['Prix total'].max())
-    
-    if pd.isna(min_val_df): min_val_df = 0.0
-    if pd.isna(max_val_df): max_val_df = 10000.0
-    if min_val_df == max_val_df: max_val_df = min_val_df + 1.0
+# --- NOUVEAU FILTRE : CHAMPS NUMÉRIQUES POUR MONTANT ---
+st.sidebar.markdown("### 💰 Filtre Montant (€)")
 
-    montant_min, montant_max = st.sidebar.slider(
-        "Intervalle de montant (€) :",
-        min_value=min_val_df,
-        max_value=max_val_df,
-        value=(min_val_df, max_val_df)
-    )
+if 'Prix total' in df.columns and not df.empty:
+    min_val_reel = float(df['Prix total'].min())
+    max_val_reel = float(df['Prix total'].max())
+    
+    # Initialisation des colonnes de saisie
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        montant_min = st.number_input(
+            "Min (€)", 
+            min_value=0.0, 
+            max_value=max_val_reel, 
+            value=0.0, 
+            step=100.0
+        )
+    with col2:
+        montant_max = st.number_input(
+            "Max (€)", 
+            min_value=0.0, 
+            max_value=max_val_reel, 
+            value=max_val_reel, 
+            step=100.0
+        )
+
+    # Application du masque de filtrage
     mask_metier &= df["Prix total"].between(montant_min, montant_max)
 else:
     montant_min, montant_max = 0.0, 0.0
