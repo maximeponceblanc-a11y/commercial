@@ -1167,7 +1167,7 @@ if 'Taux de marge' in df_filtered_base.columns:
         # GRAPHIQUE NOUVEAU : NUAGE DE POINTS — TAUX DE MARGE × TEMPS
         # -------------------------------------------------------
         st.markdown("#### 🔵 Détail des taux de marge dans le temps")
-        st.caption("Axe Y : Taux de marge (%) · Axe X : date · Taille : quantité (nb exemplaires) · Couleur : statut signé/non signé")
+        st.caption("Axe Y : Taux de marge (%) · Axe X : date · Taille : prix total du devis (€) · Couleur : statut signé/non signé")
 
         df_marge_scatter = df_filtered_base.dropna(subset=['Taux de marge', 'Dates_Propres']).copy()
 
@@ -1175,7 +1175,7 @@ if 'Taux de marge' in df_filtered_base.columns:
             df_marge_scatter['Statut'] = df_marge_scatter["Signé?"].apply(
                 lambda x: "Signé ✅" if str(x).upper().strip() == "O" else "Non signé ❌"
             )
-            df_marge_scatter['Nb_plot'] = df_marge_scatter['Nb exemplaires'].fillna(1).clip(lower=1)
+            df_marge_scatter['Prix_plot'] = df_marge_scatter['Prix total'].fillna(0).clip(lower=1)
 
             if vue_annuelle:
                 df_marge_scatter['X_val'] = df_marge_scatter['Année Devis'].astype(str)
@@ -1192,14 +1192,14 @@ if 'Taux de marge' in df_filtered_base.columns:
                 df_marge_scatter,
                 x='X_val',
                 y='Taux de marge',
-                size='Nb_plot',
+                size='Prix_plot',
                 color='Statut',
                 color_discrete_map=color_map_marge,
                 hover_data={
                     'Nom Client': True,
                     'DEVIS N°': True if 'DEVIS N°' in df_marge_scatter.columns else False,
-                    'Nb_plot': False,
-                    'Nb exemplaires': True,
+                    'Prix_plot': False,
+                    'Prix total': ':.2f',
                     'Taux de marge': ':.2f',
                     'X_val': False,
                 },
@@ -1209,6 +1209,7 @@ if 'Taux de marge' in df_filtered_base.columns:
                     'X_val': x_title_marge,
                     'Taux de marge': 'Taux de marge (%)',
                     'Statut': 'Statut',
+                    'Prix total': 'Prix total (€)',
                 },
             )
 
@@ -1236,7 +1237,7 @@ if 'Taux de marge' in df_filtered_base.columns:
         # GRAPHIQUE 2 : NUAGE DE POINTS — PRIX UNITAIRE × TEMPS
         # -------------------------------------------------------
         st.markdown("#### 🔵 Prix unitaire des devis dans le temps")
-        st.caption("Axe Y : prix unitaire (Échelle Logarithmique) · Axe X : date · Taille : quantité (nb exemplaires) · Couleur : statut signé/non signé")
+        st.caption("Axe Y : prix unitaire (Échelle Logarithmique) · Axe X : date · Taille : prix total du devis (€) · Couleur : statut signé/non signé")
 
         if 'Prix unitaire' in df_filtered_base.columns:
             df_scatter = df_filtered_base.dropna(subset=['Prix unitaire', 'Dates_Propres']).copy()
@@ -1246,7 +1247,7 @@ if 'Taux de marge' in df_filtered_base.columns:
                 df_scatter['Statut'] = df_scatter["Signé?"].apply(
                     lambda x: "Signé ✅" if str(x).upper().strip() == "O" else "Non signé ❌"
                 )
-                df_scatter['Nb_plot'] = df_scatter['Nb exemplaires'].fillna(1).clip(lower=1)
+                df_scatter['Prix_plot'] = df_scatter['Prix total'].fillna(0).clip(lower=1)
 
                 if vue_annuelle:
                     df_scatter['X_val'] = df_scatter['Année Devis'].astype(str)
@@ -1263,14 +1264,14 @@ if 'Taux de marge' in df_filtered_base.columns:
                     df_scatter,
                     x='X_val',
                     y='Prix unitaire',
-                    size='Nb_plot',
+                    size='Prix_plot',
                     color='Statut',
                     color_discrete_map=color_map,
                     hover_data={
                         'Nom Client': True,
                         'DEVIS N°': True if 'DEVIS N°' in df_scatter.columns else False,
-                        'Nb_plot': False,
-                        'Nb exemplaires': True,
+                        'Prix_plot': False,
+                        'Prix total': ':.2f',
                         'Prix unitaire': ':.2f',
                         'X_val': False,
                     },
@@ -1280,6 +1281,7 @@ if 'Taux de marge' in df_filtered_base.columns:
                         'X_val': x_title,
                         'Prix unitaire': 'Prix unitaire (€)',
                         'Statut': 'Statut',
+                        'Prix total': 'Prix total (€)',
                     },
                 )
 
