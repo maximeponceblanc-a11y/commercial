@@ -338,29 +338,21 @@ if search_client and "Nom Client" in df.columns:
 if search_devis and "DEVIS N°" in df.columns:
     mask_metier &= df["DEVIS N°"].astype(str).str.contains(search_devis, case=False, na=False)
 
-# ─── NOUVEAU FILTRE : COMMERCIAL (UNIQUEMENT POUR PONCEBLANC) ───
-options_commercial = []
-selected_commercial = []
-if bu_name == "PONCEBLANC" and "Commercial" in df.columns:
-    st.sidebar.markdown("### 👤 Filtre Commercial")
-    # Récupération des commerciaux uniques et triés
-    options_commercial = sorted([str(x) for x in df["Commercial"].dropna().unique()])
-    selected_commercial = st.sidebar.multiselect(
-        "Sélectionner un ou plusieurs commerciaux :",
-        options=options_commercial,
-        default=options_commercial
-    )
-    # Application du filtre sur le masque métier
-    if selected_commercial:
-        mask_metier &= df["Commercial"].astype(str).isin(selected_commercial)
-
-
 for col_df, label in [("Type de produit", "Type de produit")]:
     if col_df in df.columns:
         options = sorted([str(x) for x in df[col_df].dropna().unique()])
         selected = st.sidebar.multiselect(label, options=options)
         if selected:
             mask_metier &= df[col_df].astype(str).isin(selected)
+
+# --- FILTRE COMMERCIAL (visible uniquement lorsque le toggle est sur PONCEBLANC) ---
+selected_commercial = []
+if bu_name == "PONCEBLANC" and "Commercial" in df.columns:
+    st.sidebar.markdown("### 🧑‍💼 Filtre Commercial")
+    options_commercial = sorted([str(x) for x in df["Commercial"].dropna().unique()])
+    selected_commercial = st.sidebar.multiselect("Commercial", options=options_commercial)
+    if selected_commercial:
+        mask_metier &= df["Commercial"].astype(str).isin(selected_commercial)
 
 st.sidebar.markdown("### 📈 Analyse avancée")
 show_trends = st.sidebar.checkbox("Afficher les courbes de tendance", value=False, help="Affiche les tendances linéaires et le R² pour analyser la dynamique sur les graphiques de nuage de points.")
@@ -1165,4 +1157,208 @@ if 'Taux de marge' in df_filtered_base.columns:
 
                 fig_marge_bar.update_layout(
                     barmode='group',
-                    xaxis=dict(title=x_label_m
+                    xaxis=dict(title=x_label_marge, type='category'),
+                    yaxis=dict(title="Taux de marge (%)", showgrid=True, range=[0, max(
+                        df_taux[['Taux moyen global', 'Taux moyen signé', 'Taux moyen refusé']].max(skipna=True).max() * 1.25, 10
+                    )]),
+                    legend=dict(orientation="h", y=1.08, x=0),
+                    hovermode="x unified",
+                    height=380,
+                    margin=dict(t=30, b=40),
+                )
+                st.plotly_chart(fig_marge_bar, use_container_width=True, key="fig_marge_bar")
+        else:
+            st.info("Aucune donnée de taux de marge disponible pour les filtres sélectionnés.")
+
+        st.write("---")
+
+        # -------------------------------------------------------
+        # GRAPHIQUE NOUVEAU : NUAGE DE POINTS — TAUX DE MARGE × TEMPS
+        # -------------------------------------------------------
+        st.markdown("#### 🔵 Détail des taux de marge dans le temps")
+        st.caption("Axe Y : Taux de marge (%) · Axe X : date · Taille : prix total du devis (€) · Couleur : statut signé/non signé")
+
+        df_marge_scatter = df_filtered_base.dropna(subset=['Taux de marge', 'Dates_Propres']).copy()
+
+        if not df_marge_scatter.empty:
+            df_marge_scatter['Statut'] = df_marge_scatter["Signé?"].apply(
+                lambda x: "Signé ✅" if str(x).upper().strip() == "O" else "Non signé ❌"
+            )
+            df_marge_scatter['Prix_plot'] = df_marge_scatter['Prix total'].fillna(0).clip(lower=1)
+
+            if vue_annuelle:
+                df_marge_scatter['X_val'] = df_marge_scatter['Année Devis'].astype(str)
+                x_axis_type_marge = 'category'
+                x_title_marge = "Année"
+            else:
+                df_marge_scatter['X_val'] = df_marge_scatter['Dates_Propres']
+                x_axis_type_marge = 'date'
+                x_title_marge = "Date"
+
+            color_map_marge = {"Signé ✅": "#22c55e", "Non signé ❌": "#ef4444"}
+
+            fig_scatter_marge = px.scatter(
+                df_marge_scatter,
+                x='X_val',
+                y='Taux de marge',
+                size='Prix_plot',
+                color='Statut',
+                color_discrete_map=color_map_marge,
+                hover_data={
+                    'Nom Client': True,
+                    'DEVIS N°': True if 'DEVIS N°' in df_marge_scatter.columns else False,
+                    'Prix_plot': False,
+                    'Prix total': ':.2f',
+                    'Taux de marge': ':.2f',
+                    'X_val': False,
+                },
+                size_max=40,
+                opacity=0.7,
+                labels={
+                    'X_val': x_title_marge,
+                    'Taux de marge': 'Taux de marge (%)',
+                    'Statut': 'Statut',
+                    'Prix total': 'Prix total (€)',
+                },
+            )
+
+            if show_trends:
+                add_trendlines_to_fig(fig_scatter_marge, df_marge_scatter, 'X_val', 'Taux de marge', is_log=False)
+
+            fig_scatter_marge.update_layout(
+                xaxis=dict(title=x_title_marge, type=x_axis_type_marge),
+                yaxis=dict(
+                    title="Taux de marge (%)",
+                    showgrid=True,
+                ),
+                legend=dict(orientation="h", y=1.18, x=0, title_text=""),
+                hovermode="closest",
+                height=520,
+                margin=dict(t=30, b=40),
+            )
+            st.plotly_chart(fig_scatter_marge, use_container_width=True, key="fig_scatter_marge_temps")
+        else:
+            st.info("Aucune donnée de date/marge valide pour ce graphique.")
+
+        st.write("---")
+
+        # -------------------------------------------------------
+        # GRAPHIQUE 2 : NUAGE DE POINTS — PRIX UNITAIRE × TEMPS
+        # -------------------------------------------------------
+        st.markdown("#### 🔵 Prix unitaire des devis dans le temps")
+        st.caption("Axe Y : prix unitaire (Échelle Logarithmique) · Axe X : date · Taille : prix total du devis (€) · Couleur : statut signé/non signé")
+
+        if 'Prix unitaire' in df_filtered_base.columns:
+            df_scatter = df_filtered_base.dropna(subset=['Prix unitaire', 'Dates_Propres']).copy()
+            df_scatter = df_scatter[df_scatter['Prix unitaire'] > 0]
+
+            if not df_scatter.empty:
+                df_scatter['Statut'] = df_scatter["Signé?"].apply(
+                    lambda x: "Signé ✅" if str(x).upper().strip() == "O" else "Non signé ❌"
+                )
+                df_scatter['Prix_plot'] = df_scatter['Prix total'].fillna(0).clip(lower=1)
+
+                if vue_annuelle:
+                    df_scatter['X_val'] = df_scatter['Année Devis'].astype(str)
+                    x_axis_type = 'category'
+                    x_title = "Année"
+                else:
+                    df_scatter['X_val'] = df_scatter['Dates_Propres']
+                    x_axis_type = 'date'
+                    x_title = "Date"
+
+                color_map = {"Signé ✅": "#22c55e", "Non signé ❌": "#ef4444"}
+
+                fig_scatter = px.scatter(
+                    df_scatter,
+                    x='X_val',
+                    y='Prix unitaire',
+                    size='Prix_plot',
+                    color='Statut',
+                    color_discrete_map=color_map,
+                    hover_data={
+                        'Nom Client': True,
+                        'DEVIS N°': True if 'DEVIS N°' in df_scatter.columns else False,
+                        'Prix_plot': False,
+                        'Prix total': ':.2f',
+                        'Prix unitaire': ':.2f',
+                        'X_val': False,
+                    },
+                    size_max=40,
+                    opacity=0.7,
+                    labels={
+                        'X_val': x_title,
+                        'Prix unitaire': 'Prix unitaire (€)',
+                        'Statut': 'Statut',
+                        'Prix total': 'Prix total (€)',
+                    },
+                )
+
+                if show_trends:
+                    add_trendlines_to_fig(fig_scatter, df_scatter, 'X_val', 'Prix unitaire', is_log=True)
+
+                fig_scatter.update_layout(
+                    xaxis=dict(title=x_title, type=x_axis_type),
+                    yaxis=dict(
+                        title="Prix unitaire (€) — Échelle Log",
+                        type='log',
+                        showgrid=True,
+                    ),
+                    legend=dict(orientation="h", y=1.18, x=0, title_text=""),
+                    hovermode="closest",
+                    height=520,
+                    margin=dict(t=30, b=40),
+                )
+                st.plotly_chart(fig_scatter, use_container_width=True, key="fig_scatter_prix")
+            else:
+                st.info("Aucune donnée de prix unitaire disponible pour les filtres sélectionnés.")
+        else:
+            st.info("La colonne 'Prix unitaire' n'a pas pu être calculée (vérifiez 'Prix total' et 'Nb exemplaires').")
+
+    else:
+        st.info("Aucune donnée de taux de marge disponible pour les filtres sélectionnés.")
+else:
+    st.info("Colonne 'Taux de marge' absente des données.")
+
+
+# ========================================================
+# PIED DE PAGE : RÉSUMÉ DES FILTRES ACTIFS
+# ========================================================
+def construire_resume_filtres():
+    parties = []
+    maille = "Annuelle" if vue_annuelle else "Mensuelle"
+    parties.append(f"BU : {bu_name}")
+    parties.append(f"Maille : {maille}")
+    if annees_selectionnees:
+        parties.append(f"Années : {', '.join(str(a) for a in sorted(annees_selectionnees))}")
+    if not vue_annuelle:
+        if start_month == end_month:
+            parties.append(f"Mois : {start_month}")
+        else:
+            parties.append(f"Mois : {start_month} → {end_month}")
+            
+    # Ajout du filtre de montant dans le récapitulatif
+    parties.append(f"Montant : {montant_min:,.0f}€ à {montant_max:,.0f}€".replace(',', ' '))
+    
+    if selected_abc and len(selected_abc) < 4:
+        parties.append(f"Catégorie ABC : {', '.join(selected_abc)}")
+    else:
+        parties.append("Catégorie ABC : Toutes")
+    if selected_commercial:
+        parties.append(f"Commercial : {', '.join(selected_commercial)}")
+    if search_client:
+        parties.append(f"Client : « {search_client} »")
+    if search_devis:
+        parties.append(f"Devis : « {search_devis} »")
+    parties.append(f"{len(df_filtered_base)} ligne(s) affichée(s)")
+    now = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
+    parties.append(f"Édité le {now}")
+    return "  ·  ".join(parties)
+
+st.markdown("---")
+st.markdown(
+    f"<p style='font-size:0.75em; color:#94a3b8; text-align:center; margin-top:4px;'>"
+    f"🖨️ {construire_resume_filtres()}"
+    f"</p>",
+    unsafe_allow_html=True
+)
