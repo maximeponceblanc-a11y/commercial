@@ -6,7 +6,6 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import datetime
 import io
-import requests
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Tableau de bord Commercial", layout="wide", page_icon="📊")
@@ -81,18 +80,14 @@ liste_mois_noms = [
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 ]
 
-# --- CHARGEMENT DES DONNÉES DEPUIS GITHUB (LBFI OU PONCEBLANC) ---
+# --- CHARGEMENT DES DONNÉES DEPUIS UN FICHIER UPLOADÉ (LBFI OU PONCEBLANC) ---
 @st.cache_data
-def load_data(bu_name):
-    url_github = "https://raw.githubusercontent.com/maximeponceblanc-a11y/LBFI_Commercial/main/Query_tableau_devis.xlsx"
-
+def load_data(fichier_bytes, bu_name):
     try:
-        response = requests.get(url_github)
-        response.raise_for_status()
         # On charge la feuille sélectionnée (LBFI ou PONCEBLANC)
-        df = pd.read_excel(io.BytesIO(response.content), sheet_name=bu_name)
+        df = pd.read_excel(io.BytesIO(fichier_bytes), sheet_name=bu_name)
     except Exception as e:
-        st.error(f"Erreur lors de la récupération du fichier sur GitHub pour {bu_name} : {e}")
+        st.error(f"Erreur lors de la lecture du fichier pour la feuille {bu_name} : {e}")
         st.stop()
 
     df.columns = df.columns.str.strip()
@@ -235,9 +230,21 @@ st.sidebar.header("🎛️ Filtres & Paramètres")
 bu_toggle = st.sidebar.toggle("📈 Basculer vers LBFI (Par défaut : PONCEBLANC)", value=False)
 bu_name = "LBFI" if bu_toggle else "PONCEBLANC"
 
+# --- CHARGEMENT DU FICHIER PAR L'UTILISATEUR ---
+st.sidebar.markdown("### 📂 Fichier de données")
+fichier_uploade = st.sidebar.file_uploader(
+    "Charger le fichier Excel (Query_tableau_devis.xlsx)",
+    type=["xlsx"],
+    help="Le fichier doit contenir les feuilles 'LBFI' et 'PONCEBLANC'."
+)
+
+if fichier_uploade is None:
+    st.info("👋 Veuillez charger le fichier Excel des devis dans la barre latérale pour afficher le tableau de bord.")
+    st.stop()
+
 # Chargement dynamique des données de la BU sélectionnée
 try:
-    df = load_data(bu_name)
+    df = load_data(fichier_uploade.getvalue(), bu_name)
 except Exception as e:
     st.stop()
 
