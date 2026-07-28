@@ -97,7 +97,8 @@ def load_data(fichier_bytes, bu_name):
         df = df.rename(columns={
             'Dates': 'Date devis',
             'Taux Marge': 'Taux de marge',
-            'Date Ouverture': 'Date ouverture dossier fab'
+            'Date Ouverture': 'Date ouverture dossier fab',
+            'Signé': 'Signé?'
         })
 
     # --- NETTOYAGE ET PRÉPARATION DES DONNÉES ---
