@@ -84,7 +84,7 @@ liste_mois_noms = [
 # --- CHARGEMENT DES DONNÉES DEPUIS GITHUB (LBFI OU PONCEBLANC) ---
 @st.cache_data
 def load_data(bu_name):
-    url_github = "https://raw.githubusercontent.com/maximeponceblanc-a11y/LBFICommercial/main/Query_tableau_devis.xlsx"
+    url_github = "https://raw.githubusercontent.com/maximeponceblanc-a11y/LBFI_Commercial/main/Query_tableau_devis.xlsx"
 
     try:
         response = requests.get(url_github)
